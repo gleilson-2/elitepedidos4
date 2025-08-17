@@ -60,6 +60,7 @@ const SalesHistoryPanel: React.FC<SalesHistoryPanelProps> = ({ storeId }) => {
   const [expandedSales, setExpandedSales] = useState<Set<string>>(new Set());
   const [paymentFilter, setPaymentFilter] = useState<string>('all');
   const [supabaseConfigured, setSupabaseConfigured] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   const salesTable = storeId === 1 ? 'pdv_sales' : 'store2_sales';
   const itemsTable = storeId === 1 ? 'pdv_sale_items' : 'store2_sale_items';
@@ -83,6 +84,7 @@ const SalesHistoryPanel: React.FC<SalesHistoryPanelProps> = ({ storeId }) => {
   const fetchSales = async () => {
     try {
       setLoading(true);
+      setRefreshing(true);
       setError(null);
 
       if (!supabaseConfigured) {
@@ -198,7 +200,7 @@ const SalesHistoryPanel: React.FC<SalesHistoryPanelProps> = ({ storeId }) => {
         return;
       }
 
-      console.log(`🔄 Carregando vendas da Loja ${storeId} para ${dateFilter}...`);
+      console.log(`🔄 Carregando vendas da Loja ${storeId} para a data: ${dateFilter}`);
 
       // Buscar vendas do PDV
       const { data: pdvSales, error: pdvError } = await supabase
@@ -207,12 +209,14 @@ const SalesHistoryPanel: React.FC<SalesHistoryPanelProps> = ({ storeId }) => {
           *,
           ${itemsTable}(*)
         `)
-        .gte('created_at', `${dateFilter}T00:00:00`)
-        .lte('created_at', `${dateFilter}T23:59:59`)
+        .gte('created_at', `${dateFilter}T00:00:00.000Z`)
+        .lt('created_at', `${new Date(new Date(dateFilter).getTime() + 24 * 60 * 60 * 1000).toISOString().split('T')[0]}T00:00:00.000Z`)
         .order('created_at', { ascending: false })
         .limit(50);
 
       if (pdvError) throw pdvError;
+
+      console.log(`📊 Vendas PDV encontradas: ${pdvSales?.length || 0}`);
 
       // Buscar vendas das mesas
       const { data: tableSales, error: tableError } = await supabase
@@ -222,8 +226,8 @@ const SalesHistoryPanel: React.FC<SalesHistoryPanelProps> = ({ storeId }) => {
           ${tableItemsTable}(*),
           ${tablesTable}!table_id(number)
         `)
-        .gte('created_at', `${dateFilter}T00:00:00`)
-        .lte('created_at', `${dateFilter}T23:59:59`)
+        .gte('created_at', `${dateFilter}T00:00:00.000Z`)
+        .lt('created_at', `${new Date(new Date(dateFilter).getTime() + 24 * 60 * 60 * 1000).toISOString().split('T')[0]}T00:00:00.000Z`)
         .eq('status', 'fechada')
         .order('created_at', { ascending: false })
         .limit(50);
@@ -231,6 +235,8 @@ const SalesHistoryPanel: React.FC<SalesHistoryPanelProps> = ({ storeId }) => {
       if (tableError) {
         console.warn('Erro ao carregar vendas das mesas:', tableError);
       }
+
+      console.log(`📊 Vendas de mesa encontradas: ${tableSales?.length || 0}`);
 
       // Combinar vendas do PDV e das mesas
       const allSales: Sale[] = [];
@@ -262,13 +268,14 @@ const SalesHistoryPanel: React.FC<SalesHistoryPanelProps> = ({ storeId }) => {
       // Ordenar por data de criação (mais recente primeiro)
       allSales.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-      console.log(`✅ ${pdvSales?.length || 0} vendas PDV + ${tableSales?.length || 0} vendas de mesa carregadas da Loja ${storeId}`);
+      console.log(`✅ Total de vendas carregadas da Loja ${storeId} para ${dateFilter}: ${allSales.length} (${pdvSales?.length || 0} PDV + ${tableSales?.length || 0} mesa)`);
       setSales(allSales);
     } catch (err) {
       console.error(`❌ Erro ao carregar vendas da Loja ${storeId}:`, err);
       setError(err instanceof Error ? err.message : 'Erro ao carregar vendas');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -375,8 +382,8 @@ const SalesHistoryPanel: React.FC<SalesHistoryPanelProps> = ({ storeId }) => {
           disabled={loading}
           className="bg-blue-500 hover:bg-blue-600 disabled:bg-blue-300 text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
         >
-          <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-          Atualizar
+          <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
+          {refreshing ? 'Atualizando...' : 'Atualizar'}
         </button>
       </div>
 
@@ -396,6 +403,9 @@ const SalesHistoryPanel: React.FC<SalesHistoryPanelProps> = ({ storeId }) => {
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
+            <p className="text-xs text-gray-500 mt-1">
+              Vendas da data selecionada: {new Date(dateFilter).toLocaleDateString('pt-BR')}
+            </p>
           </div>
 
           <div>
@@ -508,9 +518,15 @@ const SalesHistoryPanel: React.FC<SalesHistoryPanelProps> = ({ storeId }) => {
             <p className="text-gray-500">
               {searchTerm || paymentFilter !== 'all' 
                 ? 'Tente ajustar os filtros de busca'
-                : `Nenhuma venda foi realizada na Loja ${storeId} no dia selecionado`
+                : `Nenhuma venda foi realizada na Loja ${storeId} em ${new Date(dateFilter).toLocaleDateString('pt-BR')}`
               }
             </p>
+            <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <p className="text-blue-700 text-sm">
+                <strong>Dica:</strong> Verifique se a data está correta e se há vendas registradas para este dia.
+                Clique em "Atualizar" para recarregar os dados.
+              </p>
+            </div>
           </div>
         ) : (
           <div className="divide-y divide-gray-200">
@@ -547,7 +563,7 @@ const SalesHistoryPanel: React.FC<SalesHistoryPanelProps> = ({ storeId }) => {
                       <div className="flex items-center gap-4 text-sm text-gray-600 mt-1">
                         <div className="flex items-center gap-1">
                           <Clock size={14} />
-                          <span>{formatDateTime(sale.created_at)}</span>
+                          <span>{new Date(sale.created_at).toLocaleString('pt-BR')}</span>
                         </div>
                         {sale.customer_name && (
                           <div className="flex items-center gap-1">
@@ -650,10 +666,6 @@ const SalesHistoryPanel: React.FC<SalesHistoryPanelProps> = ({ storeId }) => {
                           </div>
                         </div>
                       )}
-                      <div className="flex items-center gap-1">
-                        <Package size={14} />
-                        <span>{sale.source === 'table' ? 'Venda Presencial' : 'Venda PDV'}</span>
-                      </div>
                     </div>
                   </div>
                 )}

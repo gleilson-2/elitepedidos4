@@ -56,7 +56,7 @@ const SalesHistoryPanel: React.FC<SalesHistoryPanelProps> = ({ storeId }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [dateFilter, setDateFilter] = useState(new Date().toISOString().split('T')[0]);
+  const [dateFilter, setDateFilter] = useState('');
   const [expandedSales, setExpandedSales] = useState<Set<string>>(new Set());
   const [paymentFilter, setPaymentFilter] = useState<string>('all');
   const [supabaseConfigured, setSupabaseConfigured] = useState(true);
@@ -82,6 +82,14 @@ const SalesHistoryPanel: React.FC<SalesHistoryPanelProps> = ({ storeId }) => {
   }, []);
 
   const fetchSales = async () => {
+    // Não carregar vendas se não houver data selecionada
+    if (!dateFilter) {
+      setSales([]);
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
+
     try {
       setLoading(true);
       setRefreshing(true);
@@ -337,7 +345,13 @@ const SalesHistoryPanel: React.FC<SalesHistoryPanelProps> = ({ storeId }) => {
   };
 
   useEffect(() => {
-    fetchSales();
+    // Só carregar vendas se houver data selecionada
+    if (dateFilter) {
+      fetchSales();
+    } else {
+      setSales([]);
+      setLoading(false);
+    }
   }, [dateFilter]);
 
   if (loading) {
@@ -401,16 +415,19 @@ const SalesHistoryPanel: React.FC<SalesHistoryPanelProps> = ({ storeId }) => {
                 value={dateFilter}
                 onChange={(e) => setDateFilter(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
               />
             </div>
-            <p className="text-xs text-gray-500 mt-1">
-              Vendas de: {new Date(dateFilter + 'T12:00:00').toLocaleDateString('pt-BR', { 
-                weekday: 'long', 
-                day: '2-digit', 
-                month: '2-digit', 
-                year: 'numeric' 
-              })}
-            </p>
+            {dateFilter && (
+              <p className="text-xs text-gray-500 mt-1">
+                Vendas de: {new Date(dateFilter + 'T12:00:00').toLocaleDateString('pt-BR', { 
+                  weekday: 'long', 
+                  day: '2-digit', 
+                  month: '2-digit', 
+                  year: 'numeric' 
+                })}
+              </p>
+            )}
           </div>
 
           <div>
@@ -502,23 +519,47 @@ const SalesHistoryPanel: React.FC<SalesHistoryPanelProps> = ({ storeId }) => {
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
         <div className="p-4 border-b border-gray-200">
           <h3 className="text-lg font-semibold text-gray-800">
-            Vendas do Dia ({filteredSales.length})
+            {dateFilter ? `Vendas do Dia (${filteredSales.length})` : 'Selecione uma Data'}
           </h3>
-          <p className="text-sm text-gray-600">
-            {new Date(dateFilter + 'T12:00:00').toLocaleDateString('pt-BR', { 
-              weekday: 'long', 
-              year: 'numeric', 
-              month: 'long', 
-              day: 'numeric' 
-            })}
-          </p>
-          <p className="text-xs text-gray-500 mt-1">
-            Data selecionada: {new Date(dateFilter + 'T12:00:00').toLocaleDateString('pt-BR')} • 
-            {filteredSales.length > 0 ? `${filteredSales.length} venda(s) encontrada(s)` : 'Nenhuma venda encontrada'}
-          </p>
+          {dateFilter ? (
+            <>
+              <p className="text-sm text-gray-600">
+                {new Date(dateFilter + 'T12:00:00').toLocaleDateString('pt-BR', { 
+                  weekday: 'long', 
+                  year: 'numeric', 
+                  month: 'long', 
+                  day: 'numeric' 
+                })}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                Data selecionada: {new Date(dateFilter + 'T12:00:00').toLocaleDateString('pt-BR')} • 
+                {filteredSales.length > 0 ? `${filteredSales.length} venda(s) encontrada(s)` : 'Nenhuma venda encontrada'}
+              </p>
+            </>
+          ) : (
+            <p className="text-sm text-gray-600">
+              Selecione uma data no filtro acima para visualizar o histórico de vendas
+            </p>
+          )}
         </div>
 
-        {filteredSales.length === 0 ? (
+        {!dateFilter ? (
+          <div className="text-center py-12">
+            <Calendar size={48} className="mx-auto text-gray-300 mb-4" />
+            <h3 className="text-lg font-medium text-gray-600 mb-2">
+              Selecione uma Data
+            </h3>
+            <p className="text-gray-500">
+              Escolha uma data no filtro acima para visualizar o histórico de vendas da Loja {storeId}
+            </p>
+            <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-3 max-w-md mx-auto">
+              <p className="text-blue-700 text-sm">
+                <strong>💡 Dica:</strong> Use o campo "Data" acima para selecionar o dia que deseja consultar.
+                O sistema mostrará todas as vendas (PDV + Mesas) realizadas na data escolhida.
+              </p>
+            </div>
+          </div>
+        ) : filteredSales.length === 0 ? (
           <div className="text-center py-12">
             <ShoppingBag size={48} className="mx-auto text-gray-300 mb-4" />
             <h3 className="text-lg font-medium text-gray-600 mb-2">
@@ -527,7 +568,7 @@ const SalesHistoryPanel: React.FC<SalesHistoryPanelProps> = ({ storeId }) => {
             <p className="text-gray-500">
               {searchTerm || paymentFilter !== 'all' 
                 ? 'Tente ajustar os filtros de busca'
-                : `Nenhuma venda foi realizada na Loja ${storeId} em ${new Date(dateFilter + 'T12:00:00').toLocaleDateString('pt-BR', {
+                : `Nenhuma venda foi realizada na Loja ${storeId} no dia ${new Date(dateFilter + 'T12:00:00').toLocaleDateString('pt-BR', {
                     weekday: 'long',
                     day: '2-digit',
                     month: '2-digit', 
@@ -537,8 +578,8 @@ const SalesHistoryPanel: React.FC<SalesHistoryPanelProps> = ({ storeId }) => {
             </p>
             <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-3">
               <p className="text-blue-700 text-sm">
-                <strong>Dica:</strong> Verifique se a data está correta e se há vendas registradas para este dia.
-                Clique em "Atualizar\" para recarregar os dados.
+                <strong>💡 Dica:</strong> Verifique se a data está correta e se há vendas registradas para este dia.
+                Clique em "Atualizar" para recarregar os dados ou tente uma data diferente.
               </p>
             </div>
           </div>

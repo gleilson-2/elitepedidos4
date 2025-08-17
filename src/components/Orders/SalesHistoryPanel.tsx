@@ -404,7 +404,12 @@ const SalesHistoryPanel: React.FC<SalesHistoryPanelProps> = ({ storeId }) => {
               />
             </div>
             <p className="text-xs text-gray-500 mt-1">
-              Vendas da data selecionada: {new Date(dateFilter).toLocaleDateString('pt-BR')}
+              Vendas de: {new Date(dateFilter + 'T12:00:00').toLocaleDateString('pt-BR', { 
+                weekday: 'long', 
+                day: '2-digit', 
+                month: '2-digit', 
+                year: 'numeric' 
+              })}
             </p>
           </div>
 
@@ -500,12 +505,16 @@ const SalesHistoryPanel: React.FC<SalesHistoryPanelProps> = ({ storeId }) => {
             Vendas do Dia ({filteredSales.length})
           </h3>
           <p className="text-sm text-gray-600">
-            {new Date(dateFilter).toLocaleDateString('pt-BR', { 
+            {new Date(dateFilter + 'T12:00:00').toLocaleDateString('pt-BR', { 
               weekday: 'long', 
               year: 'numeric', 
               month: 'long', 
               day: 'numeric' 
             })}
+          </p>
+          <p className="text-xs text-gray-500 mt-1">
+            Data selecionada: {new Date(dateFilter + 'T12:00:00').toLocaleDateString('pt-BR')} • 
+            {filteredSales.length > 0 ? `${filteredSales.length} venda(s) encontrada(s)` : 'Nenhuma venda encontrada'}
           </p>
         </div>
 
@@ -518,7 +527,12 @@ const SalesHistoryPanel: React.FC<SalesHistoryPanelProps> = ({ storeId }) => {
             <p className="text-gray-500">
               {searchTerm || paymentFilter !== 'all' 
                 ? 'Tente ajustar os filtros de busca'
-                : `Nenhuma venda foi realizada na Loja ${storeId} em ${new Date(dateFilter).toLocaleDateString('pt-BR')}`
+                : `Nenhuma venda foi realizada na Loja ${storeId} em ${new Date(dateFilter + 'T12:00:00').toLocaleDateString('pt-BR', {
+                    weekday: 'long',
+                    day: '2-digit',
+                    month: '2-digit', 
+                    year: 'numeric'
+                  })}`
               }
             </p>
             <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-3">

@@ -579,7 +579,7 @@ const SalesHistoryPanel: React.FC<SalesHistoryPanelProps> = ({ storeId }) => {
             <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-3">
               <p className="text-blue-700 text-sm">
                 <strong>💡 Dica:</strong> Verifique se a data está correta e se há vendas registradas para este dia.
-                Clique em "Atualizar" para recarregar os dados ou tente uma data diferente.
+                Clique em "Atualizar\" para recarregar os dados ou tente uma data diferente.
               </p>
             </div>
           </div>
